@@ -1,0 +1,701 @@
+/* Digital Piano — Light pastel blue design inspired by The ONE keyboard */
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: #f5f5f5;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
+  position: relative;
+}
+
+.backButton {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: #fff;
+  border: 1px solid #ddd;
+  color: #555;
+  text-decoration: none;
+  font-size: 1.25rem;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.backButton:hover {
+  background: #f8f8f8;
+  color: #333;
+}
+
+.backButton:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Main piano body — light pastel blue */
+.piano {
+  width: min(95vw, 960px);
+  background: linear-gradient(
+    180deg,
+    #a8c5db 0%,
+    #9bb9d0 20%,
+    #8fadc5 50%,
+    #88a6be 80%,
+    #7d9bb3 100%
+  );
+  border-radius: 16px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Top panel — speakers and control area */
+/* Drag handle — add this class to elements you want to use as drag handles */
+.dragHandle {
+  cursor: grab;
+  user-select: none;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.topPanel {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 14px;
+  min-height: 80px;
+}
+
+.speakerGrille {
+  flex: 0 0 110px;
+  background: linear-gradient(
+    135deg,
+    #7a9db8 0%,
+    #6d8fa8 50%,
+    #5f8299 100%
+  );
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.grilleRow {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+}
+
+.grilleHole {
+  width: 3px;
+  height: 3px;
+  background: #4a6b82;
+  border-radius: 1px;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.controlArea {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.05) 100%
+  );
+  border-radius: 6px;
+}
+
+.branding {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: rgba(80, 100, 120, 0.9);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.smallButton {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #7a9db8 0%, #5f8299 100%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.smallButtonWhite {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff 0%, #e8eef4 100%);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.knob {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    #8fadc5 0%,
+    #6d8fa8 50%,
+    #5a7d96 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Keybed */
+.keybed {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    #2a3640 0%,
+    #1e2830 100%
+  );
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Overlay shown until user enables sound (browser autoplay policy) */
+.soundOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(42, 54, 64, 0.9);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  font-weight: 500;
+  z-index: 10;
+  pointer-events: none; /* Let clicks pass through to keybed */
+}
+
+.whiteKeys {
+  display: flex;
+  position: relative;
+  height: 195px;
+}
+
+.whiteKey {
+  flex: 1;
+  min-width: 0;
+  background: linear-gradient(
+    180deg,
+    #fcfcfb 0%,
+    #f0efe8 25%,
+    #e2e0d8 75%,
+    #d4d2ca 100%
+  );
+  border: none;
+  border-right: 1px solid #bbb;
+  border-radius: 0 0 6px 6px;
+  cursor: pointer;
+  transition: background 0.08s, box-shadow 0.08s;
+  position: relative;
+}
+
+.whiteKey:first-child {
+  border-radius: 6px 0 6px 6px;
+}
+
+.whiteKey:last-child {
+  border-right: none;
+  border-radius: 0 6px 6px 6px;
+}
+
+.whiteKey:hover {
+  background: linear-gradient(
+    180deg,
+    #fff 0%,
+    #f5f4ed 25%,
+    #e8e6de 75%,
+    #dbd9d1 100%
+  );
+}
+
+/* Dark gray when key is pressed */
+.whiteKey.pressed {
+  background: linear-gradient(
+    180deg,
+    #c8c6c2 0%,
+    #b8b6b2 30%,
+    #a8a6a2 70%,
+    #989692 100%
+  );
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.whiteKey:disabled {
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+/* Keyboard shortcut label on white keys */
+.whiteKey .keyLabel {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #666;
+  pointer-events: none;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
+}
+
+.blackKeys {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  height: 124px;
+  pointer-events: none;
+}
+
+.blackKey {
+  position: absolute;
+  width: 3%;
+  margin-left: -1.5%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    #2a2a2a 0%,
+    #1a1a1a 50%,
+    #0d0d0d 100%
+  );
+  border: none;
+  border-radius: 0 0 4px 4px;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: background 0.08s, box-shadow 0.08s;
+}
+
+.blackKey:hover {
+  background: linear-gradient(
+    180deg,
+    #3a3a3a 0%,
+    #252525 50%,
+    #151515 100%
+  );
+}
+
+/* Dark gray when black key is pressed */
+.blackKey.pressed {
+  background: linear-gradient(
+    180deg,
+    #1a1a1a 0%,
+    #0d0d0d 50%,
+    #050505 100%
+  );
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.blackKey:disabled {
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+/* Keyboard shortcut label on black keys */
+.blackKey .keyLabelBlack {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
+}
+
+/* Shared panel styles — same shadow, border, background, font, min-height */
+.panel {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 255, 255, 1);
+  border-radius: 10px;
+  box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.15);
+  border: 1px solid #E5E1E1;
+  min-height: 160px;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
+  transition: box-shadow 0.15s, border-color 0.15s, border-width 0.15s;
+}
+
+.panel:hover {
+  border: 1px solid #739FBF;
+  box-shadow: 0px 6px 20px 0px rgba(0, 0, 0, 0.25);
+}
+
+.panelDragging {
+  border: 1.3px solid #5290BC !important;
+  box-shadow: 0px 6px 20px 0px rgba(0, 0, 0, 0.25);
+}
+
+.panelTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+/* Waveform visualization window */
+.waveformVisualization {
+  width: 407px;
+  min-width: 407px;
+  min-height: fit-content;
+  height: fit-content;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.waveformVizTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.waveformCanvas {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: 120px;
+  background: #000000;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+/* Separate Waveform control window */
+.waveformControl {
+  width: 407px;
+  min-width: 407px;
+  min-height: fit-content;
+  height: fit-content;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.waveformTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.waveformOptions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+.waveformButton {
+  flex: 1;
+  min-width: 80px;
+  padding: 0.45rem 0.6rem;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #E5E1E1;
+  border-radius: 8px;
+  background: #F1F3F4;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  box-sizing: border-box;
+}
+
+.waveformButton:hover {
+  background: #DDE4E9;
+  border: 1px solid #739FBF;
+}
+
+.waveformButtonActive {
+  background: #E8F0F6;
+  border: 1px solid #5290BC;
+  color: #4A6B82;
+}
+
+.waveformButtonLabel {
+  text-transform: capitalize;
+  font-weight: 400;
+  font-size: 12px;
+  color: #666666;
+}
+
+.waveformButtonActive .waveformButtonLabel {
+  font-weight: 700;
+}
+
+.waveformButtonDesc {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: #888;
+}
+
+.waveformButtonActive .waveformButtonDesc {
+  color: #4A6B82;
+}
+
+/* Autoplay panel */
+.autoplayPanel {
+  width: 280px;
+  min-width: 280px;
+}
+
+.songList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.autoplaySongCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: "Georgia", "Times New Roman", serif;
+  border-radius: 8px;
+  background: #F1F3F4;
+  border: 1px solid #E5E1E1;
+  color: rgba(74, 107, 130, 1);
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.autoplaySongCard:hover:not(:disabled) {
+  background: #DDE4E9;
+  border: 1px solid #739FBF;
+}
+
+.autoplaySongCard:disabled {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.songCardSelected {
+  background: #E8F0F6;
+  border: 1px solid #5290BC;
+}
+
+.autoplaySongLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.autoplaySongDescWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+}
+
+.autoplaySongCardIconSlot {
+  flex-shrink: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.autoplaySongCardIcon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  vertical-align: middle;
+}
+
+.autoplaySongCardIconHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.autoplaySongDesc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: rgba(74, 107, 130, 0.9);
+}
+
+.autoplaySongDescTrack {
+  display: inline-flex;
+  animation: autoplayMarquee 8s linear infinite;
+}
+
+.autoplaySongDescInner {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@keyframes autoplayMarquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.autoplayButtons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.autoplayButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid #ccc;
+  background: #f8f8f8;
+}
+
+.autoplayButton:hover:not(:disabled) {
+  background: rgba(220, 232, 243, 0.95);
+  border-color: #4A6B82;
+}
+
+.autoplayButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.autoplayPlay {
+  background: #e8f0f6;
+  border-color: #7d9bb3;
+  color: #4a6b82;
+}
+
+.autoplayPlay:hover:not(:disabled) {
+  background: rgba(220, 232, 243, 0.95);
+  border-color: #4A6B82;
+}
+
+.autoplayStop {
+  color: #666;
+}
+
+.settings {
+  width: fit-content;
+}
+
+.settingsTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.settingsRow {
+  margin-bottom: 0.75rem;
+}
+
+.settingsRow:last-child {
+  margin-bottom: 0;
+}
+
+.settingsLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 12px;
+  color: rgba(102, 102, 102, 1);
+}
+
+.settingsSelect {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  max-width: 200px;
+}
+
+.settingsRange {
+  width: 100%;
+  max-width: 200px;
+  height: 6px;
+  accent-color: #7d9bb3;
+}
+
+.pageTitleBlock {
+  position: absolute;
+  left: -14px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pageTitle {
+  font-family: "SF Mono", Consolas, Monaco, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  color: #33556B;
+  margin: 0;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: #777;
+}
+
+.error {
+  margin-top: 1rem;
+  font-size: 12px;
+  color: #c44;
+}
