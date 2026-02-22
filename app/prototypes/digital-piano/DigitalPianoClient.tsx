@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import Link from "next/link";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import styles from "./styles.module.css";
 
 // Tone.js is loaded only in the browser to prevent HTTP 500 (it uses AudioContext, window, etc.)
@@ -17,6 +16,9 @@ function DraggableWindow({
   initialPosition,
   centerOnMount,
   horizontalLayout,
+  centerOffsetX,
+  positionType = "fixed",
+  centered,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -26,9 +28,19 @@ function DraggableWindow({
   initialPosition: { x: number; y: number };
   centerOnMount?: boolean;
   horizontalLayout?: "left" | "center" | "right";
+  centerOffsetX?: number;
+  positionType?: "fixed" | "absolute";
+  centered?: boolean;
 }) {
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
+
+  const updateCenterPosition = useCallback(() => {
+    const w = window.innerWidth;
+    if (centerOffsetX !== undefined) {
+      setPosition((prev) => ({ ...prev, x: w / 2 + centerOffsetX }));
+    }
+  }, [centerOffsetX]);
 
   useEffect(() => {
     const w = window.innerWidth;
@@ -37,13 +49,22 @@ function DraggableWindow({
     } else if (horizontalLayout) {
       const x = horizontalLayout === "left" ? w * 0.25 : horizontalLayout === "center" ? w * 0.5 : w * 0.75;
       setPosition((prev) => ({ ...prev, x, y: prev.y }));
+    } else if (centerOffsetX !== undefined) {
+      updateCenterPosition();
     }
-  }, [centerOnMount, horizontalLayout]);
+  }, [centerOnMount, horizontalLayout, centerOffsetX, updateCenterPosition]);
+
+  useEffect(() => {
+    if (centerOffsetX === undefined) return;
+    const handler = () => updateCenterPosition();
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, [centerOffsetX, updateCenterPosition]);
   const startRef = useRef({ x: 0, y: 0 });
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!(e.target as HTMLElement).closest("[data-drag-handle]")) return;
-    if ((e.target as HTMLElement).closest("button, input")) return;
+    const el = e.target as HTMLElement;
+    if (el.closest("button, input, select, a[href]")) return;
     startRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     setIsDragging(true);
   }, [position.x, position.y]);
@@ -65,17 +86,19 @@ function DraggableWindow({
     };
   }, [isDragging]);
 
+  const positionStyles = centered
+    ? { left: "50%", top: "50%", transform: "translate(-50%, -50%)" }
+    : { left: position.x, top: position.y, transform: "translate(-50%, 0)" as const };
+
   return (
     <div
       className={[className, isDragging && draggingClassName].filter(Boolean).join(" ")}
       title={title}
       style={{
         ...style,
-        position: "fixed",
-        left: position.x,
-        top: position.y,
+        position: positionType,
+        ...positionStyles,
         zIndex: 10,
-        transform: "translate(-50%, 0)",
       }}
       onMouseDown={handleMouseDown}
     >
@@ -390,15 +413,16 @@ export default function DigitalPianoClient() {
   const toneRef = useRef<ToneModule | null>(null);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [oscillatorType, setOscillatorType] = useState<OscillatorType>("triangle");
-  const [attack, setAttack] = useState(0.01);
+  const [oscillatorType, setOscillatorType] = useState<OscillatorType>("sine");
+  const [attack, setAttack] = useState(0.02);
   const [volume, setVolume] = useState(1);
-  const [delayAmount, setDelayAmount] = useState(0);
+  const [reverbAmount, setReverbAmount] = useState(0);
   const [filterCutoff, setFilterCutoff] = useState(1);
   const [chorusAmount, setChorusAmount] = useState(0);
   const [isAutoplaying, setIsAutoplaying] = useState(false);
   const [selectedSongId, setSelectedSongId] = useState<SongId | null>(null);
   const [hoveredSongId, setHoveredSongId] = useState<SongId | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const synthRef = useRef<InstanceType<ToneModule["PolySynth"]> | null>(null);
   const pianoRef = useRef<{
     keyDown: (o: { note: string; time?: number; velocity?: number }) => void;
@@ -412,16 +436,50 @@ export default function DigitalPianoClient() {
   const gainRef = useRef<InstanceType<ToneModule["Gain"]> | null>(null);
   const filterRef = useRef<InstanceType<ToneModule["Filter"]> | null>(null);
   const chorusRef = useRef<InstanceType<ToneModule["Chorus"]> | null>(null);
-  const delayRef = useRef<InstanceType<ToneModule["FeedbackDelay"]> | null>(null);
+  const reverbRef = useRef<InstanceType<ToneModule["Freeverb"]> | null>(null);
+  const limiterRef = useRef<InstanceType<ToneModule["Limiter"]> | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const autoplayTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const pageTitleRef = useRef<HTMLDivElement | null>(null);
+  const [pianoTop, setPianoTop] = useState(484); // 405 + 59 + 20 fallback until measured
+
+  useLayoutEffect(() => {
+    const el = pageTitleRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setPianoTop(rect.bottom + 20);
+    };
+    update();
+    window.addEventListener("resize", update);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      window.removeEventListener("resize", update);
+      ro.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    import("tone").then((Tone) => {
-      toneRef.current = Tone;
-      setToneReady(true);
-    });
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) setToneReady(true);
+    }, 8000);
+    import("tone")
+      .then((Tone) => {
+        if (!cancelled) {
+          toneRef.current = Tone;
+          setToneReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setToneReady(true);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
@@ -435,24 +493,29 @@ export default function DigitalPianoClient() {
 
     synthRef.current = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: oscillatorType },
-      envelope: { attack, decay: 0.2, sustain: 0.5, release: 0.5 },
+      envelope: { attack, decay: 0.2, sustain: 0.5, release: 0.2 },
+      maxPolyphony: 10,
     });
 
-    // Filter: lowpass. Square/sawtooth get a gentler max (3000Hz) to tame harsh overtones
-    const maxFreq = oscillatorType === "square" || oscillatorType === "sawtooth" ? 2800 : 7800;
+    // Filter: lowpass. Aggressive rolloff to reduce noise (sine/triangle 3800Hz max, square/sawtooth 2200Hz max).
+    const maxFreq = oscillatorType === "square" || oscillatorType === "sawtooth" ? 2200 : 3800;
     const filterFreq = 200 + filterCutoff * maxFreq;
     filterRef.current = new Tone.Filter(filterFreq, "lowpass");
+    filterRef.current.Q.value = 0.3;
     gainRef.current = new Tone.Gain(volume);
     chorusRef.current = new Tone.Chorus(2, 2.5, 0.5).start();
     chorusRef.current.wet.setValueAtTime(chorusAmount, Tone.now());
-    delayRef.current = new Tone.FeedbackDelay("8n", 0.4);
-    delayRef.current.wet.setValueAtTime(delayAmount, Tone.now());
+    reverbRef.current = new Tone.Freeverb({ roomSize: 0.5, dampening: 12000 });
+    reverbRef.current.wet.setValueAtTime(reverbAmount, Tone.now());
+    const limiter = new Tone.Limiter(-1);
+    limiterRef.current = limiter;
 
     synthRef.current.connect(filterRef.current);
     filterRef.current.connect(gainRef.current);
     gainRef.current.connect(chorusRef.current);
-    chorusRef.current.connect(delayRef.current);
-    delayRef.current.connect(analyser);
+    chorusRef.current.connect(reverbRef.current);
+    reverbRef.current.connect(limiter);
+    limiter.connect(analyser);
     analyser.connect(context.destination);
 
     return () => {
@@ -468,14 +531,16 @@ export default function DigitalPianoClient() {
       gainRef.current = null;
       chorusRef.current?.dispose();
       chorusRef.current = null;
-      delayRef.current?.dispose();
-      delayRef.current = null;
+      reverbRef.current?.dispose();
+      reverbRef.current = null;
+      limiterRef.current?.dispose();
+      limiterRef.current = null;
     };
   }, [toneReady, oscillatorType, attack]);
 
   // Update effect params without rebuilding chain (avoids audio glitches)
   useEffect(() => {
-    const maxFreq = oscillatorType === "square" || oscillatorType === "sawtooth" ? 2800 : 7800;
+    const maxFreq = oscillatorType === "square" || oscillatorType === "sawtooth" ? 2200 : 3800;
     const filterFreq = 200 + filterCutoff * maxFreq;
     filterRef.current?.frequency.setValueAtTime(filterFreq, toneRef.current?.now() ?? 0);
   }, [filterCutoff, oscillatorType]);
@@ -485,8 +550,8 @@ export default function DigitalPianoClient() {
   }, [chorusAmount]);
 
   useEffect(() => {
-    delayRef.current?.wet.setValueAtTime(delayAmount, toneRef.current?.now() ?? 0);
-  }, [delayAmount]);
+    reverbRef.current?.wet.setValueAtTime(reverbAmount, toneRef.current?.now() ?? 0);
+  }, [reverbAmount]);
 
   useEffect(() => {
     const Tone = toneRef.current;
@@ -561,7 +626,7 @@ export default function DigitalPianoClient() {
 
   const playAutoplay = useCallback(async (songId?: SongId) => {
     await unlockAudio();
-    if (isAutoplaying) return;
+    if (isAutoplaying && songId == null) return;
 
     // Wait for synth to be ready (useEffect runs after mount)
     let synth = synthRef.current;
@@ -585,7 +650,7 @@ export default function DigitalPianoClient() {
       const id = setTimeout(() => {
         const Tone = toneRef.current;
         setPressedKeys((prev) => new Set(prev).add(note));
-        if (Tone) synthRef.current?.triggerAttackRelease(note, noteDurSec, Tone.now(), 0.7);
+        if (Tone) synthRef.current?.triggerAttackRelease(note, noteDurSec, Tone.now(), 0.65);
         const releaseId = setTimeout(() => {
           setPressedKeys((prev) => {
             const next = new Set(prev);
@@ -619,25 +684,264 @@ export default function DigitalPianoClient() {
     return (
       <div className={styles.container} style={{ padding: "2rem", textAlign: "center", fontFamily: "system-ui" }}>
         <p style={{ color: "#666" }}>Loading piano…</p>
-        <Link href="/" style={{ color: "#0066cc", textDecoration: "underline" }}>
-          ← Back to home
-        </Link>
       </div>
     );
   }
 
   return (
-    <div className={styles.container}>
-      <Link href="/" className={styles.backButton} aria-label="Back to home">
-        ←
-      </Link>
+    <div className={styles.container} style={{ backgroundColor: "rgba(227, 236, 242, 0.9)" }}>
+      <button
+        type="button"
+        className={styles.helpToggle}
+        onClick={() => setHelpOpen((o) => !o)}
+        aria-label={helpOpen ? "Close help" : "Open help"}
+        aria-expanded={helpOpen}
+      >
+        <span className={styles.helpToggleIcon} aria-hidden>+</span>
+      </button>
+
+      {helpOpen && (
+        <div className={styles.helpOverlay} onClick={() => setHelpOpen(false)} role="dialog" aria-modal="true" aria-label="How to play">
+          <div className={styles.helpPanel} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.helpText}>
+              <h2 className={styles.helpTldr}>Inspired by my childhood piano memories</h2>
+              <p>
+                Some of my earliest childhood memories begin with a piano.
+                <br /><br />
+                The wonderful feeling of pressing a key and hearing a note bloom into the air, the purest form of joy coming from the tips of my fingers. Music has always felt like a private language to me. While a physical piano has its limits, I made one that can live on a screen, ready whenever my inspiration strikes.
+                <br /><br />
+                Thank you for being part of this memory with me today. Have fun playing!
+                <br /><br />
+                Designed and built by{" "}
+                <a
+                  href="https://www.linkedin.com/in/jencz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.helpSignatureLink}
+                >
+                  Jen Zhang
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div ref={pageTitleRef} className={styles.pageTitleBlock} style={{ top: "401px" }}>
+        <h2 className={styles.pageTitle}>
+          Digital Piano by{" "}
+          <a
+            href="https://www.linkedin.com/in/jencz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.pageTitleLink}
+          >
+            Jen
+          </a>
+        </h2>
+        <p className={styles.hint}>
+          Play with your mouse or keyboard. Adjust the settings and try the sample songs.
+        </p>
+      </div>
 
       <DraggableWindow
-        className={styles.piano}
-        initialPosition={{ x: 640, y: 480 }}
-        centerOnMount
+        className={`${styles.panel} ${styles.waveformControl}`}
+        draggingClassName={styles.panelDragging}
+        title="Drag me"
+        initialPosition={{ x: 0, y: 15 }}
+        centerOffsetX={292}
       >
-        <div className={`${styles.topPanel} ${styles.dragHandle}`} data-drag-handle>
+        <h3 className={`${styles.waveformTitle} ${styles.dragHandle}`} data-drag-handle>Oscillator Type</h3>
+        <div className={styles.waveformOptions}>
+          {(["sine", "triangle", "square", "sawtooth"] as const).map((type) => (
+            <button
+              key={type}
+              type="button"
+              className={`${styles.waveformButton} ${oscillatorType === type ? styles.waveformButtonActive : ""}`}
+              onClick={() => setOscillatorType(type)}
+              aria-pressed={oscillatorType === type}
+            >
+              <span className={styles.waveformButtonLabel}>{type}</span>
+              <span className={styles.waveformButtonDesc}>
+                {type === "sine" && "soft"}
+                {type === "triangle" && "mellow"}
+                {type === "square" && "hollow"}
+                {type === "sawtooth" && "bright"}
+              </span>
+            </button>
+          ))}
+        </div>
+      </DraggableWindow>
+
+      <DraggableWindow
+        className={`${styles.panel} ${styles.waveformVisualization}`}
+        draggingClassName={styles.panelDragging}
+        title="Drag me"
+        initialPosition={{ x: 0, y: 171 }}
+        centerOffsetX={298}
+      >
+        <WaveformVisualization
+          analyserRef={analyserRef}
+          oscillatorType={oscillatorType}
+        />
+      </DraggableWindow>
+
+      <DraggableWindow
+        className={`${styles.panel} ${styles.autoplayPanel}`}
+        draggingClassName={styles.panelDragging}
+        title="Drag me"
+        initialPosition={{ x: 0, y: 86 }}
+        centerOffsetX={-366}
+      >
+        <h3 className={`${styles.settingsTitle} ${styles.dragHandle}`} data-drag-handle>
+          Sample Songs
+        </h3>
+        <div className={styles.songList}>
+          {SONGS.map((song) => {
+            const isSelected = selectedSongId === song.id;
+            const isHovered = hoveredSongId === song.id;
+            const isThisPlaying = isSelected && isAutoplaying;
+            const showIcon = isSelected || isHovered;
+            return (
+              <button
+                key={song.id}
+                type="button"
+                className={`${styles.autoplaySongCard} ${isSelected ? styles.songCardSelected : ""}`}
+                onMouseEnter={() => setHoveredSongId(song.id)}
+                onMouseLeave={() => setHoveredSongId(null)}
+                onClick={() => {
+                  if (isSelected) {
+                    if (isAutoplaying) stopAutoplay();
+                    else playAutoplay(song.id);
+                  } else {
+                    stopAutoplay();
+                    setSelectedSongId(song.id);
+                    playAutoplay(song.id);
+                  }
+                }}
+                aria-label={isThisPlaying ? `Stop ${song.title}` : `Play ${song.title} by ${song.composer}`}
+                aria-pressed={isSelected}
+              >
+                <span className={styles.autoplaySongLabel}>{song.title}</span>
+                <span className={styles.autoplaySongDescWrapper}>
+                  <span className={styles.autoplaySongCardIconSlot} aria-hidden>
+                    <img
+                      src={isThisPlaying ? "/stop.svg" : "/play_arrow.svg"}
+                      alt=""
+                      width={16}
+                      height={16}
+                      className={`${styles.autoplaySongCardIcon} ${!showIcon ? styles.autoplaySongCardIconHidden : ""}`}
+                    />
+                  </span>
+                  <span className={styles.autoplaySongDesc}>
+                    {isThisPlaying ? (
+                      <span className={styles.autoplaySongDescTrack}>
+                        <span className={styles.autoplaySongDescInner}>{song.composer} · {song.source}</span>
+                        <span className={styles.autoplaySongDescInner} aria-hidden>{song.composer} · {song.source}</span>
+                      </span>
+                    ) : (
+                      <span className={styles.autoplaySongDescInner}>{song.composer} · {song.source}</span>
+                    )}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </DraggableWindow>
+
+      <DraggableWindow
+        className={`${styles.panel} ${styles.settings}`}
+        draggingClassName={styles.panelDragging}
+        title="Drag me"
+        initialPosition={{ x: 0, y: 21 }}
+        centerOffsetX={-68}
+      >
+        <h3 className={`${styles.settingsTitle} ${styles.dragHandle}`} data-drag-handle>Sound Control</h3>
+        <div className={styles.settingsRow}>
+          <label className={styles.settingsLabel}>
+            Volume {(volume * 100).toFixed(0)}%
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              className={styles.settingsRange}
+            />
+          </label>
+        </div>
+        <div className={styles.settingsRow}>
+          <label className={styles.settingsLabel}>
+            Attack {(attack * 1000).toFixed(0)}ms
+            <input
+              type="range"
+              min="0.001"
+              max="0.5"
+              step="0.005"
+              value={attack}
+              onChange={(e) => setAttack(Number(e.target.value))}
+              className={styles.settingsRange}
+            />
+          </label>
+        </div>
+        <div className={styles.settingsRow}>
+          <label className={styles.settingsLabel}>
+            Filter (brightness) {(filterCutoff * 100).toFixed(0)}%
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={filterCutoff}
+              onChange={(e) => setFilterCutoff(Number(e.target.value))}
+              className={styles.settingsRange}
+            />
+          </label>
+        </div>
+        <div className={styles.settingsRow}>
+          <label className={styles.settingsLabel}>
+            Reverb {(reverbAmount * 100).toFixed(0)}%
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={reverbAmount}
+              onChange={(e) => setReverbAmount(Number(e.target.value))}
+              className={styles.settingsRange}
+            />
+          </label>
+        </div>
+        <div className={styles.settingsRow}>
+          <label className={styles.settingsLabel}>
+            Chorus {(chorusAmount * 100).toFixed(0)}%
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={chorusAmount}
+              onChange={(e) => setChorusAmount(Number(e.target.value))}
+              className={styles.settingsRange}
+            />
+          </label>
+        </div>
+      </DraggableWindow>
+
+      <div
+        className={styles.piano}
+        style={{
+          position: "fixed",
+          left: "50%",
+          top: pianoTop,
+          transform: "translateX(-50%)",
+          zIndex: 10,
+        }}
+      >
+        <div className={styles.topPanel}>
           <div className={styles.speakerGrille} aria-hidden="true">
             {Array.from({ length: 8 }, (_, i) => (
               <div key={i} className={styles.grilleRow}>
@@ -736,196 +1040,7 @@ export default function DigitalPianoClient() {
             ))}
           </div>
         </div>
-      </DraggableWindow>
-
-      <div className={styles.pageTitleBlock} style={{ top: "405px" }}>
-        <h2 className={styles.pageTitle}>My Digital Piano</h2>
-        <p className={styles.hint}>
-          Play with your mouse or keyboard. Adjust the settings and try the sample songs.
-        </p>
       </div>
-
-      <DraggableWindow
-        className={`${styles.panel} ${styles.waveformControl}`}
-        draggingClassName={styles.panelDragging}
-        title="Drag me"
-        initialPosition={{ x: 782, y: 15 }}
-      >
-        <h3 className={`${styles.waveformTitle} ${styles.dragHandle}`} data-drag-handle>Oscillator Type</h3>
-        <div className={styles.waveformOptions}>
-          {(["sine", "triangle", "square", "sawtooth"] as const).map((type) => (
-            <button
-              key={type}
-              type="button"
-              className={`${styles.waveformButton} ${oscillatorType === type ? styles.waveformButtonActive : ""}`}
-              onClick={() => setOscillatorType(type)}
-              aria-pressed={oscillatorType === type}
-            >
-              <span className={styles.waveformButtonLabel}>{type}</span>
-              <span className={styles.waveformButtonDesc}>
-                {type === "sine" && "soft"}
-                {type === "triangle" && "mellow"}
-                {type === "square" && "hollow"}
-                {type === "sawtooth" && "bright"}
-              </span>
-            </button>
-          ))}
-        </div>
-      </DraggableWindow>
-
-      <DraggableWindow
-        className={`${styles.panel} ${styles.waveformVisualization}`}
-        draggingClassName={styles.panelDragging}
-        title="Drag me"
-        initialPosition={{ x: 788, y: 171 }}
-      >
-        <WaveformVisualization
-          analyserRef={analyserRef}
-          oscillatorType={oscillatorType}
-        />
-      </DraggableWindow>
-
-      <DraggableWindow
-        className={`${styles.panel} ${styles.autoplayPanel}`}
-        draggingClassName={styles.panelDragging}
-        title="Drag me"
-        initialPosition={{ x: 174, y: 86 }}
-      >
-        <h3 className={`${styles.settingsTitle} ${styles.dragHandle}`} data-drag-handle>
-          Sample Songs
-        </h3>
-        <div className={styles.songList}>
-          {SONGS.map((song) => {
-            const isSelected = selectedSongId === song.id;
-            const isHovered = hoveredSongId === song.id;
-            const isThisPlaying = isSelected && isAutoplaying;
-            const showIcon = isSelected || isHovered;
-            return (
-              <button
-                key={song.id}
-                type="button"
-                className={`${styles.autoplaySongCard} ${isSelected ? styles.songCardSelected : ""}`}
-                onMouseEnter={() => setHoveredSongId(song.id)}
-                onMouseLeave={() => setHoveredSongId(null)}
-                onClick={() => {
-                  if (isSelected) {
-                    if (isAutoplaying) stopAutoplay();
-                    else playAutoplay(song.id);
-                  } else {
-                    stopAutoplay();
-                    setSelectedSongId(song.id);
-                    playAutoplay(song.id);
-                  }
-                }}
-                aria-label={isThisPlaying ? `Stop ${song.title}` : `Play ${song.title} by ${song.composer}`}
-                aria-pressed={isSelected}
-              >
-                <span className={styles.autoplaySongLabel}>{song.title}</span>
-                <span className={styles.autoplaySongDescWrapper}>
-                  <span className={styles.autoplaySongCardIconSlot} aria-hidden>
-                    <img
-                      src={isThisPlaying ? "/stop.svg" : "/play_arrow.svg"}
-                      alt=""
-                      width={16}
-                      height={16}
-                      className={`${styles.autoplaySongCardIcon} ${!showIcon ? styles.autoplaySongCardIconHidden : ""}`}
-                    />
-                  </span>
-                  <span className={styles.autoplaySongDesc}>
-                    {isThisPlaying ? (
-                      <span className={styles.autoplaySongDescTrack}>
-                        <span className={styles.autoplaySongDescInner}>{song.composer} · {song.source}</span>
-                        <span className={styles.autoplaySongDescInner} aria-hidden>{song.composer} · {song.source}</span>
-                      </span>
-                    ) : (
-                      <span className={styles.autoplaySongDescInner}>{song.composer} · {song.source}</span>
-                    )}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </DraggableWindow>
-
-      <DraggableWindow
-        className={`${styles.panel} ${styles.settings}`}
-        draggingClassName={styles.panelDragging}
-        title="Drag me"
-        initialPosition={{ x: 447, y: 21 }}
-      >
-        <h3 className={`${styles.settingsTitle} ${styles.dragHandle}`} data-drag-handle>Sound Control</h3>
-        <div className={styles.settingsRow}>
-          <label className={styles.settingsLabel}>
-            Volume {(volume * 100).toFixed(0)}%
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              className={styles.settingsRange}
-            />
-          </label>
-        </div>
-        <div className={styles.settingsRow}>
-          <label className={styles.settingsLabel}>
-            Attack {(attack * 1000).toFixed(0)}ms
-            <input
-              type="range"
-              min="0.001"
-              max="0.5"
-              step="0.005"
-              value={attack}
-              onChange={(e) => setAttack(Number(e.target.value))}
-              className={styles.settingsRange}
-            />
-          </label>
-        </div>
-        <div className={styles.settingsRow}>
-          <label className={styles.settingsLabel}>
-            Filter (brightness) {(filterCutoff * 100).toFixed(0)}%
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={filterCutoff}
-              onChange={(e) => setFilterCutoff(Number(e.target.value))}
-              className={styles.settingsRange}
-            />
-          </label>
-        </div>
-        <div className={styles.settingsRow}>
-          <label className={styles.settingsLabel}>
-            Delay {(delayAmount * 100).toFixed(0)}%
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={delayAmount}
-              onChange={(e) => setDelayAmount(Number(e.target.value))}
-              className={styles.settingsRange}
-            />
-          </label>
-        </div>
-        <div className={styles.settingsRow}>
-          <label className={styles.settingsLabel}>
-            Chorus {(chorusAmount * 100).toFixed(0)}%
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={chorusAmount}
-              onChange={(e) => setChorusAmount(Number(e.target.value))}
-              className={styles.settingsRange}
-            />
-          </label>
-        </div>
-      </DraggableWindow>
     </div>
   );
 }

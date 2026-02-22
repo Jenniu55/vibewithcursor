@@ -1,3 +1,24 @@
+/* Design tokens - editorial, premium (reference style) */
+:root {
+  --max-width: 1200px;
+  --border-radius: 8px;
+  --border-radius-sm: 6px;
+  /* Oatmeal / warm off-white */
+  --color-bg: #FCF8F5;
+  --color-surface: rgba(255, 255, 255, 0.9);
+  --color-surface-solid: #ffffff;
+  /* Dark reddish-brown accent */
+  --color-accent: #B35F52;
+  --color-border: rgba(179, 95, 82, 0.2);
+  --color-border-strong: rgba(179, 95, 82, 0.4);
+  /* Text */
+  --color-text: #2c2c2c;
+  --color-text-muted: #5a5a5a;
+  /* Shadows - minimal */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
 /* CSS Reset */
 /* 1. Use a more-intuitive box-sizing model */
 *, *::before, *::after {
@@ -16,6 +37,11 @@ body {
   -webkit-font-smoothing: antialiased;
   /* 5. Set default font */
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Light oatmeal background - clean, editorial */
+  background-color: var(--color-bg);
+  background-attachment: fixed;
+  color: var(--color-text);
+  min-height: 100vh;
 }
 
 /* 5. Improve media defaults */
@@ -47,4 +73,20 @@ h1, h2, h3, h4, h5, h6 {
 */
 #root, #__next {
   isolation: isolate;
+}
+
+/* Cursor trail - sparkles */
+@keyframes cursorTrailFade {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
 } 

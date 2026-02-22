@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 
 const loadingEl = (
   <div
@@ -14,13 +13,9 @@ const loadingEl = (
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      gap: "1rem",
     }}
   >
     <p style={{ color: "#666" }}>Loading piano…</p>
-    <Link href="/" style={{ color: "#0066cc", textDecoration: "underline" }}>
-      ← Back to home
-    </Link>
   </div>
 );
 
