@@ -482,8 +482,8 @@ export default function DigitalPianoClient() {
     synthRef.current = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: oscillatorType },
       envelope: { attack, decay: 0.2, sustain: 0.5, release: 0.2 },
-      maxPolyphony: 10,
     });
+    synthRef.current.maxPolyphony = 10;
 
     // Filter: lowpass. Aggressive rolloff to reduce noise (sine/triangle 3800Hz max, square/sawtooth 2200Hz max).
     const maxFreq = oscillatorType === "square" || oscillatorType === "sawtooth" ? 2200 : 3800;
