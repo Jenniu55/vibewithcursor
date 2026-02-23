@@ -26,5 +26,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "typescript": "^5"
+  },
+  "overrides": {
+    "tone": "^14.6.1"
   }
 }
