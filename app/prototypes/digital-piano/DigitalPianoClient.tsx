@@ -421,15 +421,6 @@ export default function DigitalPianoClient() {
   const [hoveredSongId, setHoveredSongId] = useState<SongId | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const synthRef = useRef<InstanceType<ToneModule["PolySynth"]> | null>(null);
-  const pianoRef = useRef<{
-    keyDown: (o: { note: string; time?: number; velocity?: number }) => void;
-    keyUp: (o: { note: string; time?: number }) => void;
-    loaded: boolean;
-    load: () => Promise<void>;
-    stopAll: () => void;
-    connect: (node: unknown) => void;
-    dispose?: () => void;
-  } | null>(null);
   const gainRef = useRef<InstanceType<ToneModule["Gain"]> | null>(null);
   const filterRef = useRef<InstanceType<ToneModule["Filter"]> | null>(null);
   const chorusRef = useRef<InstanceType<ToneModule["Chorus"]> | null>(null);
@@ -520,8 +511,6 @@ export default function DigitalPianoClient() {
       analyserRef.current = null;
       synthRef.current?.dispose();
       synthRef.current = null;
-      pianoRef.current?.dispose?.();
-      pianoRef.current = null;
       filterRef.current?.dispose();
       filterRef.current = null;
       gainRef.current?.dispose();
@@ -671,7 +660,6 @@ export default function DigitalPianoClient() {
   const stopAutoplay = useCallback(() => {
     autoplayTimeoutsRef.current.forEach((id) => clearTimeout(id));
     autoplayTimeoutsRef.current = [];
-    pianoRef.current?.stopAll();
     synthRef.current?.releaseAll();
     setPressedKeys(new Set());
     setIsAutoplaying(false);
