@@ -107,33 +107,32 @@ function DraggableWindow({
   );
 }
 
-// 22 white keys: C2 to C5 — letters a–v
+// 22 white keys: C3 to C6 (one octave higher for brighter sound)
 const WHITE_KEYS = [
-  "C2", "D2", "E2", "F2", "G2", "A2", "B2",
   "C3", "D3", "E3", "F3", "G3", "A3", "B3",
   "C4", "D4", "E4", "F4", "G4", "A4", "B4",
-  "C5",
+  "C5", "D5", "E5", "F5", "G5", "A5", "B5",
+  "C6",
 ];
 
 // White keys (left to right) = q w z x c v a s d f g h j k l o p b n m , .
 const KEY_TO_NOTE: Record<string, string> = {
-  // White keys — C2 to C5
-  q: "C2", w: "D2", z: "E2", x: "F2", c: "G2", v: "A2", a: "B2",
-  s: "C3", d: "D3", f: "E3", g: "F3", h: "G3", j: "A3", k: "B3",
-  l: "C4", o: "D4", p: "E4", b: "F4", n: "G4", m: "A4", ",": "B4", ".": "C5",
-  // Black keys — 1 2 3 4 5 6 7 8 9 0 - = [ ] \ (15 keys)
-  "1": "C#2", "2": "D#2", "3": "F#2", "4": "G#2", "5": "A#2",
-  "6": "C#3", "7": "D#3", "8": "F#3", "9": "G#3", "0": "A#3",
-  "-": "C#4", "=": "D#4", "[": "F#4", "]": "G#4", "\\": "A#4",
+  // White keys — C3 to C6
+  q: "C3", w: "D3", z: "E3", x: "F3", c: "G3", v: "A3", a: "B3",
+  s: "C4", d: "D4", f: "E4", g: "F4", h: "G4", j: "A4", k: "B4",
+  l: "C5", o: "D5", p: "E5", b: "F5", n: "G5", m: "A5", ",": "B5", ".": "C6",
+  // Black keys
+  "1": "C#3", "2": "D#3", "3": "F#3", "4": "G#3", "5": "A#3",
+  "6": "C#4", "7": "D#4", "8": "F#4", "9": "G#4", "0": "A#4",
+  "-": "C#5", "=": "D#5", "[": "F#5", "]": "G#5", "\\": "A#5",
 };
 
 const NOTE_TO_KEY: Record<string, string> = Object.fromEntries(
   Object.entries(KEY_TO_NOTE).map(([k, v]) => [v, k])
 );
 
-// One Summer's Day (Joe Hisaishi, Spirited Away) - melody notes
-// Source: piano letter notation (pianoletternotes.blogspot.com) - transposed to fit piano (C3–E5)
-// BPM ~76; durations: "8n"=eighth, "4n"=quarter, "2n"=half
+// One Summer's Day (Joe Hisaishi, Spirited Away) - melody notes (original octave, fits C3–C6 keyboard)
+// Source: piano letter notation (pianoletternotes.blogspot.com)
 const ONE_SUMMER_DAY_MELODY: { note: string; duration: string }[] = [
   { note: "E4", duration: "8n" }, { note: "E4", duration: "8n" },
   { note: "E4", duration: "8n" }, { note: "D4", duration: "8n" }, { note: "E4", duration: "8n" },
@@ -182,8 +181,7 @@ const ONE_SUMMER_DAY_MELODY: { note: string; duration: string }[] = [
   { note: "C5", duration: "2n" },
 ];
 
-// La Valse d'Amélie / Amelie (Yann Tiersen)
-// Source: pianoletternotes.blogspot.com, MusicNotes - E minor, 3/4 waltz, transposed to fit piano (C3–E5), BPM ~100
+// La Valse d'Amélie / Amelie (Yann Tiersen) - original octave, fits C3–C6 keyboard
 const AMELIE_MELODY: { note: string; duration: string }[] = [
   { note: "E4", duration: "8n" }, { note: "B4", duration: "8n" }, { note: "E5", duration: "8n" }, { note: "G4", duration: "8n" },
   { note: "B4", duration: "8n" }, { note: "E5", duration: "8n" }, { note: "G4", duration: "8n" }, { note: "B4", duration: "8n" },
@@ -195,8 +193,7 @@ const AMELIE_MELODY: { note: string; duration: string }[] = [
   { note: "B4", duration: "8n" }, { note: "E5", duration: "8n" }, { note: "G4", duration: "8n" }, { note: "B4", duration: "2n" },
 ];
 
-// Für Elise (Beethoven) - famous opening motif
-// Source: pianoletternotes.blogspot.com - transposed to fit piano (C3–E5)
+// Für Elise (Beethoven) - famous opening motif, original octave, fits C3–C6 keyboard
 const FUR_ELISE_MELODY: { note: string; duration: string }[] = [
   { note: "E5", duration: "8n" }, { note: "D#5", duration: "8n" }, { note: "E5", duration: "8n" }, { note: "D#5", duration: "8n" },
   { note: "E5", duration: "8n" }, { note: "B4", duration: "8n" }, { note: "D5", duration: "8n" }, { note: "C5", duration: "8n" },
@@ -228,15 +225,15 @@ function getDurationSec(bpm: number): Record<string, number> {
   };
 }
 
-// Black keys for C2–C5 range (15 keys) — centered in gap between white keys, offset right by half-key width (100/22/2 ≈ 2.27%)
-const HALF_KEY_WIDTH = 100 / 22 / 2; // half of one white key's width
+// Black keys for C3–C6 range (15 keys)
+const HALF_KEY_WIDTH = 100 / 22 / 2;
 const BLACK_KEY_CONFIG: { note: string; left: number }[] = [
-  { note: "C#2", left: 2.27 + HALF_KEY_WIDTH }, { note: "D#2", left: 6.82 + HALF_KEY_WIDTH }, { note: "F#2", left: 15.91 + HALF_KEY_WIDTH },
-  { note: "G#2", left: 20.45 + HALF_KEY_WIDTH }, { note: "A#2", left: 25.00 + HALF_KEY_WIDTH },
-  { note: "C#3", left: 34.09 + HALF_KEY_WIDTH }, { note: "D#3", left: 38.64 + HALF_KEY_WIDTH }, { note: "F#3", left: 47.73 + HALF_KEY_WIDTH },
-  { note: "G#3", left: 52.27 + HALF_KEY_WIDTH }, { note: "A#3", left: 56.82 + HALF_KEY_WIDTH },
-  { note: "C#4", left: 65.91 + HALF_KEY_WIDTH }, { note: "D#4", left: 70.45 + HALF_KEY_WIDTH }, { note: "F#4", left: 79.55 + HALF_KEY_WIDTH },
-  { note: "G#4", left: 84.09 + HALF_KEY_WIDTH }, { note: "A#4", left: 88.64 + HALF_KEY_WIDTH },
+  { note: "C#3", left: 2.27 + HALF_KEY_WIDTH }, { note: "D#3", left: 6.82 + HALF_KEY_WIDTH }, { note: "F#3", left: 15.91 + HALF_KEY_WIDTH },
+  { note: "G#3", left: 20.45 + HALF_KEY_WIDTH }, { note: "A#3", left: 25.00 + HALF_KEY_WIDTH },
+  { note: "C#4", left: 34.09 + HALF_KEY_WIDTH }, { note: "D#4", left: 38.64 + HALF_KEY_WIDTH }, { note: "F#4", left: 47.73 + HALF_KEY_WIDTH },
+  { note: "G#4", left: 52.27 + HALF_KEY_WIDTH }, { note: "A#4", left: 56.82 + HALF_KEY_WIDTH },
+  { note: "C#5", left: 65.91 + HALF_KEY_WIDTH }, { note: "D#5", left: 70.45 + HALF_KEY_WIDTH }, { note: "F#5", left: 79.55 + HALF_KEY_WIDTH },
+  { note: "G#5", left: 84.09 + HALF_KEY_WIDTH }, { note: "A#5", left: 88.64 + HALF_KEY_WIDTH },
 ];
 
 type OscillatorType = "sine" | "triangle" | "square" | "sawtooth";
@@ -413,7 +410,7 @@ export default function DigitalPianoClient() {
   const toneRef = useRef<ToneModule | null>(null);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [oscillatorType, setOscillatorType] = useState<OscillatorType>("sine");
+  const [oscillatorType, setOscillatorType] = useState<OscillatorType>("triangle");
   const [attack, setAttack] = useState(0.02);
   const [volume, setVolume] = useState(1);
   const [reverbAmount, setReverbAmount] = useState(0);
