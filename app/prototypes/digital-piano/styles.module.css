@@ -27,14 +27,42 @@
   );
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: box-shadow 0.15s, border-color 0.15s;
   padding: 20px;
   border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.piano:hover {
+  box-shadow: 0px 6px 20px 0px rgba(0, 0, 0, 0.25);
+  border-color: #739FBF;
+}
+
+/* Wrapper for draggable piano — no extra size, cursor on top panel */
+.pianoWrapper {
+  display: inline-block;
+}
+
+/* Inner piano must not be positioned so the DraggableWindow controls placement */
+.pianoWrapper .piano {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+}
+
+.pianoDragging {
+  cursor: grabbing;
+}
+
+.pianoWrapper .topPanel {
+  cursor: grab;
 }
 
 /* Top panel — speakers and control area */
 /* Drag handle — add this class to elements you want to use as drag handles */
 .dragHandle {
   user-select: none;
+  cursor: grab;
 }
 
 .topPanel {
@@ -324,6 +352,18 @@
   min-height: 160px;
   font-family: "SF Mono", "Consolas", "Monaco", monospace;
   transition: box-shadow 0.15s, border-color 0.15s, border-width 0.15s;
+  cursor: grab;
+}
+
+.panel button,
+.panel a[href],
+.panel input,
+.panel select {
+  cursor: pointer;
+}
+
+.panel input[type="range"] {
+  cursor: ew-resize;
 }
 
 .panel:hover {
@@ -334,6 +374,11 @@
 .panelDragging {
   border: 1.3px solid #5290BC !important;
   box-shadow: 0px 6px 20px 0px rgba(0, 0, 0, 0.25);
+  cursor: grabbing;
+}
+
+.panelDragging .dragHandle {
+  cursor: grabbing;
 }
 
 .panelTitle {
@@ -355,8 +400,9 @@
 
 .waveformVizTitle {
   margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
   color: #555;
 }
 
@@ -365,9 +411,9 @@
   width: 100%;
   max-width: 360px;
   height: 120px;
-  background: #000000;
+  background: #ffffff;
   border-radius: 8px;
-  border: 1px solid #333;
+  border: 1px solid #E5E1E1;
 }
 
 /* Separate Waveform control window */
@@ -382,8 +428,9 @@
 
 .waveformTitle {
   margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
   color: #555;
 }
 
@@ -454,6 +501,7 @@
 .autoplayPanel {
   width: 280px;
   min-width: 280px;
+  padding-bottom: 26px;
 }
 
 .songList {
@@ -608,14 +656,16 @@
   min-height: fit-content;
   height: fit-content;
   padding-top: 16px;
-  padding-bottom: 16px;
+  padding-bottom: 26px;
+  margin-bottom: 16px;
   background: #FFFFFF;
 }
 
 .settingsTitle {
   margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
   color: #555;
   width: fit-content !important;
 }
@@ -652,10 +702,33 @@
 }
 
 .settingsRange {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   max-width: 200px;
   height: 6px;
-  accent-color: #7d9bb3;
+  background: linear-gradient(to right, #7d9bb3 calc(var(--val) * 100%), rgba(115, 159, 191, 0.25) calc(var(--val) * 100%));
+  border-radius: 3px;
+  outline: none;
+}
+
+.settingsRange::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7d9bb3;
+  cursor: ew-resize;
+}
+
+.settingsRange::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7d9bb3;
+  cursor: ew-resize;
+  border: none;
 }
 
 .settingsRange:focus {
@@ -668,8 +741,9 @@
 }
 
 .pageTitleBlock {
-  position: absolute;
-  left: -14px;
+  position: fixed;
+  top: 79px;
+  left: -23px;
   right: 0;
   display: flex;
   flex-direction: column;
@@ -687,7 +761,7 @@
 }
 
 .pageTitleLink {
-  color: inherit;
+  color: #33556B;
   text-decoration: none;
 }
 
@@ -699,8 +773,23 @@
 
 .hint {
   margin: 0;
-  font-size: 12px;
-  color: #777;
+  font-size: 13px;
+  color: #33556B;
+  text-align: center;
+}
+
+.hintDrag {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+
+.hintDragIcon {
+  display: block;
+  color: currentColor;
+  opacity: 0.9;
 }
 
 .error {
@@ -716,6 +805,7 @@
   left: 16px;
   width: 40px;
   height: 40px;
+  padding: 0;
   border-radius: 50%;
   border: 1px solid #E5E1E1;
   background: rgba(255, 255, 255, 1);
@@ -747,8 +837,14 @@
 }
 
 .helpToggleIcon {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
   transition: transform 0.3s ease;
+  transform-origin: center center;
 }
 
 .helpToggle[aria-expanded="true"] .helpToggleIcon {

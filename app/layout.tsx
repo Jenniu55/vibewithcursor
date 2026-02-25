@@ -1,25 +1,10 @@
 /**
  * Root layout component that wraps all pages in the application.
- * This layout:
- * - Sets up Geist fonts (both Sans and Mono variants)
- * - Configures metadata like title and favicon
- * - Provides the basic HTML structure
- * - Applies font variables to the entire app
+ * Uses system fonts to avoid 500 errors from font loading (e.g. under EMFILE).
  */
 
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./styles/globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "My Digital Piano",
@@ -41,9 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

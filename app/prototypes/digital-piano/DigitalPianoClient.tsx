@@ -19,6 +19,7 @@ function DraggableWindow({
   centerOffsetX,
   positionType = "fixed",
   centered,
+  zIndex,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -31,9 +32,11 @@ function DraggableWindow({
   centerOffsetX?: number;
   positionType?: "fixed" | "absolute";
   centered?: boolean;
+  zIndex?: number;
 }) {
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
+  const hasUserMovedRef = useRef(false);
 
   const updateCenterPosition = useCallback(() => {
     const w = window.innerWidth;
@@ -62,6 +65,11 @@ function DraggableWindow({
   }, [centerOffsetX, updateCenterPosition]);
   const startRef = useRef({ x: 0, y: 0 });
 
+  useEffect(() => {
+    if (hasUserMovedRef.current) return;
+    setPosition(initialPosition);
+  }, [initialPosition.x, initialPosition.y]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const el = e.target as HTMLElement;
     if (el.closest("button, input, select, a[href]")) return;
@@ -71,6 +79,7 @@ function DraggableWindow({
 
   useEffect(() => {
     if (!isDragging) return;
+    hasUserMovedRef.current = true;
     const onMove = (e: MouseEvent) => {
       setPosition({
         x: e.clientX - startRef.current.x,
@@ -86,45 +95,86 @@ function DraggableWindow({
     };
   }, [isDragging]);
 
+  const [isHovered, setIsHovered] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const el = e.target as HTMLElement;
+    if (el.closest("button, input, select, a[href]")) {
+      setIsHovered(false);
+    } else {
+      setIsHovered(true);
+      setMousePos({ x: e.clientX, y: e.clientY });
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
   const positionStyles = centered
     ? { left: "50%", top: "50%", transform: "translate(-50%, -50%)" }
     : { left: position.x, top: position.y, transform: "translate(-50%, 0)" as const };
 
+  const finalZIndex = zIndex ?? style?.zIndex ?? 10;
+
   return (
-    <div
-      className={[className, isDragging && draggingClassName].filter(Boolean).join(" ")}
-      title={title}
-      style={{
-        ...style,
-        position: positionType,
-        ...positionStyles,
-        zIndex: 10,
-      }}
-      onMouseDown={handleMouseDown}
-    >
-      {children}
-    </div>
+    <>
+      <div
+        className={[className, isDragging && draggingClassName].filter(Boolean).join(" ")}
+        style={{
+          ...style,
+          position: positionType,
+          ...positionStyles,
+          zIndex: finalZIndex,
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        {children}
+      </div>
+      {!isDragging && isHovered && title && (
+        <div
+          style={{
+            position: "fixed",
+            left: mousePos.x + 12,
+            top: mousePos.y + 16,
+            backgroundColor: "#24425B",
+            color: "#ffffff",
+            padding: "4px 8px",
+            borderRadius: "4px",
+            fontSize: "12px",
+            pointerEvents: "none",
+            zIndex: 9999,
+            fontFamily: '"SF Pro", -apple-system, BlinkMacSystemFont, sans-serif',
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+          }}
+        >
+          drag me
+        </div>
+      )}
+    </>
   );
 }
 
-// 22 white keys: C3 to C6 (one octave higher for brighter sound)
+// 18 white keys: C3 to F5
 const WHITE_KEYS = [
   "C3", "D3", "E3", "F3", "G3", "A3", "B3",
   "C4", "D4", "E4", "F4", "G4", "A4", "B4",
-  "C5", "D5", "E5", "F5", "G5", "A5", "B5",
-  "C6",
+  "C5", "D5", "E5", "F5",
 ];
 
-// White keys (left to right) = q w z x c v a s d f g h j k l o p b n m , .
+// White keys (left to right) = q w e r a s d f g h j k l ; u i o p
 const KEY_TO_NOTE: Record<string, string> = {
-  // White keys — C3 to C6
-  q: "C3", w: "D3", z: "E3", x: "F3", c: "G3", v: "A3", a: "B3",
-  s: "C4", d: "D4", f: "E4", g: "F4", h: "G4", j: "A4", k: "B4",
-  l: "C5", o: "D5", p: "E5", b: "F5", n: "G5", m: "A5", ",": "B5", ".": "C6",
+  // White keys — C3 to F5
+  q: "C3", w: "D3", e: "E3", r: "F3", a: "G3", s: "A3", d: "B3",
+  f: "C4", g: "D4", h: "E4", j: "F4", k: "G4", l: "A4", ";": "B4",
+  u: "C5", i: "D5", o: "E5", p: "F5",
   // Black keys
   "1": "C#3", "2": "D#3", "3": "F#3", "4": "G#3", "5": "A#3",
   "6": "C#4", "7": "D#4", "8": "F#4", "9": "G#4", "0": "A#4",
-  "-": "C#5", "=": "D#5", "[": "F#5", "]": "G#5", "\\": "A#5",
+  "-": "C#5", "=": "D#5",
 };
 
 const NOTE_TO_KEY: Record<string, string> = Object.fromEntries(
@@ -225,31 +275,33 @@ function getDurationSec(bpm: number): Record<string, number> {
   };
 }
 
-// Black keys for C3–C6 range (15 keys)
-const HALF_KEY_WIDTH = 100 / 22 / 2;
+// Black keys for C3–F5 range (12 keys)
 const BLACK_KEY_CONFIG: { note: string; left: number }[] = [
-  { note: "C#3", left: 2.27 + HALF_KEY_WIDTH }, { note: "D#3", left: 6.82 + HALF_KEY_WIDTH }, { note: "F#3", left: 15.91 + HALF_KEY_WIDTH },
-  { note: "G#3", left: 20.45 + HALF_KEY_WIDTH }, { note: "A#3", left: 25.00 + HALF_KEY_WIDTH },
-  { note: "C#4", left: 34.09 + HALF_KEY_WIDTH }, { note: "D#4", left: 38.64 + HALF_KEY_WIDTH }, { note: "F#4", left: 47.73 + HALF_KEY_WIDTH },
-  { note: "G#4", left: 52.27 + HALF_KEY_WIDTH }, { note: "A#4", left: 56.82 + HALF_KEY_WIDTH },
-  { note: "C#5", left: 65.91 + HALF_KEY_WIDTH }, { note: "D#5", left: 70.45 + HALF_KEY_WIDTH }, { note: "F#5", left: 79.55 + HALF_KEY_WIDTH },
-  { note: "G#5", left: 84.09 + HALF_KEY_WIDTH }, { note: "A#5", left: 88.64 + HALF_KEY_WIDTH },
+  { note: "C#3", left: (100 / 18) * 1 }, { note: "D#3", left: (100 / 18) * 2 }, { note: "F#3", left: (100 / 18) * 4 },
+  { note: "G#3", left: (100 / 18) * 5 }, { note: "A#3", left: (100 / 18) * 6 },
+  { note: "C#4", left: (100 / 18) * 8 }, { note: "D#4", left: (100 / 18) * 9 }, { note: "F#4", left: (100 / 18) * 11 },
+  { note: "G#4", left: (100 / 18) * 12 }, { note: "A#4", left: (100 / 18) * 13 },
+  { note: "C#5", left: (100 / 18) * 15 }, { note: "D#5", left: (100 / 18) * 16 },
 ];
 
 type OscillatorType = "sine" | "triangle" | "square" | "sawtooth";
 
 const WAVE_COLOR = "#7d9bb3";
-const BG_COLOR = "#000000";
-const GRID_COLOR = "rgba(200, 200, 200, 0.25)";
+const BG_COLOR = "#ffffff";
+const GRID_COLOR = "rgba(0, 0, 0, 0.06)";
 
 function drawWaveform(
   canvas: HTMLCanvasElement,
-  values: number[],
+  values: ArrayLike<number>,
   width: number,
-  height: number
+  height: number,
+  dpr: number
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+
+  // Render in CSS pixels while backing store uses device pixels
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const padding = 24;
   const w = width - padding * 2;
@@ -286,21 +338,23 @@ function drawWaveform(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  const step = Math.max(1, Math.floor(values.length / w));
   ctx.beginPath();
-  ctx.moveTo(padding, cy - (values[0] ?? 0) * (h / 2));
+  for (let px = 0; px <= w; px++) {
+    const t = w === 0 ? 0 : px / w;
+    const idx = t * (values.length - 1);
+    const i0 = Math.floor(idx);
+    const i1 = Math.min(values.length - 1, i0 + 1);
+    const frac = idx - i0;
+    const v0 = values[i0] ?? 0;
+    const v1 = values[i1] ?? v0;
+    const v = v0 * (1 - frac) + v1 * frac;
 
-  for (let i = 1; i < values.length; i += step) {
-    const x = padding + (i / values.length) * w;
-    const v = values[i] ?? 0;
+    const x = padding + px;
     const y = cy - v * (h / 2);
-    ctx.lineTo(x, y);
+    if (px === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
   }
 
-  const lastIdx = values.length - 1;
-  const lastX = padding + (lastIdx / values.length) * w;
-  const lastY = cy - (values[lastIdx] ?? 0) * (h / 2);
-  ctx.lineTo(lastX, lastY);
   ctx.stroke();
 }
 
@@ -352,33 +406,40 @@ function WaveformVisualization({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+    // Keep layout size stable while rendering at device resolution.
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
 
     let animationId: number;
 
     const draw = () => {
       const analyser = analyserRef.current;
       let hasLiveData = false;
-      let liveValues: number[] = [];
+      let liveValues: Float32Array | null = null;
 
       if (analyser) {
         if (!dataArrayRef.current || dataArrayRef.current.length !== analyser.fftSize) {
           dataArrayRef.current = new Float32Array(analyser.fftSize);
         }
         analyser.getFloatTimeDomainData(dataArrayRef.current as Float32Array<ArrayBuffer>);
-        liveValues = Array.from(dataArrayRef.current);
-        const rms = Math.sqrt(
-          liveValues.reduce((s, v) => s + v * v, 0) / liveValues.length
-        );
+        liveValues = dataArrayRef.current;
+        let sumSq = 0;
+        for (let i = 0; i < liveValues.length; i++) {
+          const v = liveValues[i] ?? 0;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / liveValues.length);
         hasLiveData = rms > 0.0005;
       }
 
-      if (hasLiveData && liveValues.length > 0) {
-        drawWaveform(canvas, liveValues, width, height);
+      if (hasLiveData && liveValues && liveValues.length > 0) {
+        drawWaveform(canvas, liveValues, width, height, dpr);
       } else {
-        const staticValues = getWaveformValues(oscillatorType, 400);
-        drawWaveform(canvas, staticValues, width, height);
+        const staticValues = getWaveformValues(oscillatorType, 2048);
+        drawWaveform(canvas, staticValues, width, height, dpr);
       }
 
       animationId = requestAnimationFrame(draw);
@@ -429,14 +490,45 @@ export default function DigitalPianoClient() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const autoplayTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const pageTitleRef = useRef<HTMLDivElement | null>(null);
-  const [pianoTop, setPianoTop] = useState(484); // 405 + 59 + 20 fallback until measured
+  const [pianoTop, setPianoTop] = useState(167);
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === "undefined" ? 1024 : window.innerWidth
+  );
+
+  useEffect(() => {
+    const handler = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
+  // Default layout (matches the browser-tuned layout)
+  const pianoWidth = Math.max(640, Math.min(viewportWidth * 0.95, 960)) + 40;
+  const PIANO_HEIGHT = 351;
+  const BELOW_SPACING = 35;
+
+  const AUTOPLAY_WIDTH = 280;
+  const SETTINGS_WIDTH = 242;
+  const WAVEFORM_CONTROL_WIDTH = 407;
+
+  const gap =
+    (pianoWidth - AUTOPLAY_WIDTH - SETTINGS_WIDTH - WAVEFORM_CONTROL_WIDTH) / 2;
+  const stackGap = 35;
+
+  const pianoCenterX = viewportWidth / 2;
+  const pianoLeft = pianoCenterX - pianoWidth / 2;
+  const autoplayLeft = pianoLeft;
+  const settingsLeft = autoplayLeft + AUTOPLAY_WIDTH + gap;
+  const waveformControlLeft = settingsLeft + SETTINGS_WIDTH + gap;
+  const panelRowTop = pianoTop + PIANO_HEIGHT + BELOW_SPACING;
+  const WAVEFORM_CONTROL_HEIGHT = 120;
+  const waveformVisualizationTop = panelRowTop + WAVEFORM_CONTROL_HEIGHT + stackGap;
 
   useLayoutEffect(() => {
     const el = pageTitleRef.current;
     if (!el) return;
     const update = () => {
       const rect = el.getBoundingClientRect();
-      setPianoTop(rect.bottom + 20);
+      setPianoTop(rect.bottom + 40);
     };
     update();
     window.addEventListener("resize", update);
@@ -713,7 +805,7 @@ export default function DigitalPianoClient() {
         </div>
       )}
 
-      <div ref={pageTitleRef} className={styles.pageTitleBlock} style={{ top: "401px" }}>
+      <div ref={pageTitleRef} className={styles.pageTitleBlock}>
         <h2 className={styles.pageTitle}>
           Digital Piano by{" "}
           <a
@@ -727,6 +819,18 @@ export default function DigitalPianoClient() {
         </h2>
         <p className={styles.hint}>
           Play with your mouse or keyboard. Adjust the settings and try the sample songs.
+          {" "}
+          <span className={styles.hintDrag}>
+            <img
+              src="/move.png"
+              alt=""
+              width={14}
+              height={14}
+              className={styles.hintDragIcon}
+              aria-hidden
+            />
+            Drag to move panels around.
+          </span>
         </p>
       </div>
 
@@ -734,8 +838,11 @@ export default function DigitalPianoClient() {
         className={`${styles.panel} ${styles.waveformControl}`}
         draggingClassName={styles.panelDragging}
         title="Drag me"
-        initialPosition={{ x: 0, y: 15 }}
-        centerOffsetX={292}
+        initialPosition={{
+          x: waveformControlLeft + WAVEFORM_CONTROL_WIDTH / 2,
+          y: panelRowTop,
+        }}
+        zIndex={15}
       >
         <h3 className={`${styles.waveformTitle} ${styles.dragHandle}`} data-drag-handle>Oscillator Type</h3>
         <div className={styles.waveformOptions}>
@@ -763,8 +870,11 @@ export default function DigitalPianoClient() {
         className={`${styles.panel} ${styles.waveformVisualization}`}
         draggingClassName={styles.panelDragging}
         title="Drag me"
-        initialPosition={{ x: 0, y: 171 }}
-        centerOffsetX={298}
+        initialPosition={{
+          x: waveformControlLeft + WAVEFORM_CONTROL_WIDTH / 2,
+          y: waveformVisualizationTop,
+        }}
+        zIndex={15}
       >
         <WaveformVisualization
           analyserRef={analyserRef}
@@ -776,8 +886,11 @@ export default function DigitalPianoClient() {
         className={`${styles.panel} ${styles.autoplayPanel}`}
         draggingClassName={styles.panelDragging}
         title="Drag me"
-        initialPosition={{ x: 0, y: 86 }}
-        centerOffsetX={-366}
+        initialPosition={{
+          x: autoplayLeft + AUTOPLAY_WIDTH / 2,
+          y: panelRowTop,
+        }}
+        zIndex={15}
       >
         <h3 className={`${styles.settingsTitle} ${styles.dragHandle}`} data-drag-handle>
           Sample Songs
@@ -840,8 +953,11 @@ export default function DigitalPianoClient() {
         className={`${styles.panel} ${styles.settings}`}
         draggingClassName={styles.panelDragging}
         title="Drag me"
-        initialPosition={{ x: 0, y: 21 }}
-        centerOffsetX={-68}
+        initialPosition={{
+          x: settingsLeft + SETTINGS_WIDTH / 2,
+          y: panelRowTop,
+        }}
+        zIndex={15}
       >
         <h3 className={`${styles.settingsTitle} ${styles.dragHandle}`} data-drag-handle>Sound Control</h3>
         <div className={styles.settingsRow}>
@@ -855,6 +971,7 @@ export default function DigitalPianoClient() {
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
               className={styles.settingsRange}
+              style={{ '--val': volume } as React.CSSProperties}
             />
           </label>
         </div>
@@ -869,6 +986,7 @@ export default function DigitalPianoClient() {
               value={attack}
               onChange={(e) => setAttack(Number(e.target.value))}
               className={styles.settingsRange}
+              style={{ '--val': attack / 0.5 } as React.CSSProperties}
             />
           </label>
         </div>
@@ -883,6 +1001,7 @@ export default function DigitalPianoClient() {
               value={filterCutoff}
               onChange={(e) => setFilterCutoff(Number(e.target.value))}
               className={styles.settingsRange}
+              style={{ '--val': filterCutoff } as React.CSSProperties}
             />
           </label>
         </div>
@@ -897,6 +1016,7 @@ export default function DigitalPianoClient() {
               value={reverbAmount}
               onChange={(e) => setReverbAmount(Number(e.target.value))}
               className={styles.settingsRange}
+              style={{ '--val': reverbAmount } as React.CSSProperties}
             />
           </label>
         </div>
@@ -911,22 +1031,21 @@ export default function DigitalPianoClient() {
               value={chorusAmount}
               onChange={(e) => setChorusAmount(Number(e.target.value))}
               className={styles.settingsRange}
+              style={{ '--val': chorusAmount } as React.CSSProperties}
             />
           </label>
         </div>
       </DraggableWindow>
 
-      <div
-        className={styles.piano}
-        style={{
-          position: "fixed",
-          left: "50%",
-          top: pianoTop,
-          transform: "translateX(-50%)",
-          zIndex: 10,
-        }}
+      <DraggableWindow
+        initialPosition={{ x: pianoCenterX, y: pianoTop }}
+        className={styles.pianoWrapper}
+        draggingClassName={styles.pianoDragging}
+        title="Drag to move piano"
+        style={{ zIndex: 10 }}
       >
-        <div className={styles.topPanel}>
+        <div className={styles.piano} style={{ margin: 0 }}>
+          <div className={`${styles.topPanel} ${styles.dragHandle}`} data-drag-handle aria-label="Drag to move piano">
           <div className={styles.speakerGrille} aria-hidden="true">
             {Array.from({ length: 8 }, (_, i) => (
               <div key={i} className={styles.grilleRow}>
@@ -1025,7 +1144,8 @@ export default function DigitalPianoClient() {
             ))}
           </div>
         </div>
-      </div>
+        </div>
+      </DraggableWindow>
     </div>
   );
 }
