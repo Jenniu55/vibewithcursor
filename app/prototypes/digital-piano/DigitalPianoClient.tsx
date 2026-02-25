@@ -34,24 +34,43 @@ function DraggableWindow({
   centered?: boolean;
   zIndex?: number;
 }) {
-  const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
   const hasUserMovedRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const positionRef = useRef(initialPosition);
+  const rafRef = useRef<number | null>(null);
+  const pendingPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const applyPosition = useCallback((pos?: { x: number; y: number }) => {
+    if (centered) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const p = pos ?? positionRef.current;
+    el.style.left = "0px";
+    el.style.top = "0px";
+    el.style.transform = `translate3d(${p.x}px, ${p.y}px, 0) translate3d(-50%, 0, 0)`;
+  }, [centered]);
 
   const updateCenterPosition = useCallback(() => {
     const w = window.innerWidth;
     if (centerOffsetX !== undefined) {
-      setPosition((prev) => ({ ...prev, x: w / 2 + centerOffsetX }));
+      const next = { ...positionRef.current, x: w / 2 + centerOffsetX };
+      positionRef.current = next;
+      applyPosition(next);
     }
-  }, [centerOffsetX]);
+  }, [centerOffsetX, applyPosition]);
 
   useEffect(() => {
     const w = window.innerWidth;
     if (centerOnMount) {
-      setPosition((prev) => ({ ...prev, x: w / 2 }));
+      const next = { ...positionRef.current, x: w / 2 };
+      positionRef.current = next;
+      applyPosition(next);
     } else if (horizontalLayout) {
       const x = horizontalLayout === "left" ? w * 0.25 : horizontalLayout === "center" ? w * 0.5 : w * 0.75;
-      setPosition((prev) => ({ ...prev, x, y: prev.y }));
+      const next = { ...positionRef.current, x };
+      positionRef.current = next;
+      applyPosition(next);
     } else if (centerOffsetX !== undefined) {
       updateCenterPosition();
     }
@@ -67,23 +86,32 @@ function DraggableWindow({
 
   useEffect(() => {
     if (hasUserMovedRef.current) return;
-    setPosition(initialPosition);
+    positionRef.current = initialPosition;
+    applyPosition(initialPosition);
   }, [initialPosition.x, initialPosition.y]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const el = e.target as HTMLElement;
     if (el.closest("button, input, select, a[href]")) return;
-    startRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
+    const p = positionRef.current;
+    startRef.current = { x: e.clientX - p.x, y: e.clientY - p.y };
     setIsDragging(true);
-  }, [position.x, position.y]);
+  }, []);
 
   useEffect(() => {
     if (!isDragging) return;
     hasUserMovedRef.current = true;
     const onMove = (e: MouseEvent) => {
-      setPosition({
+      const next = {
         x: e.clientX - startRef.current.x,
         y: e.clientY - startRef.current.y,
+      };
+      positionRef.current = next;
+      pendingPosRef.current = next;
+      if (rafRef.current != null) return;
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (pendingPosRef.current) applyPosition(pendingPosRef.current);
       });
     };
     const onUp = () => setIsDragging(false);
@@ -92,13 +120,18 @@ function DraggableWindow({
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      if (rafRef.current != null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, [isDragging]);
+  }, [isDragging, applyPosition]);
 
   const [isHovered, setIsHovered] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isDragging) return;
     const el = e.target as HTMLElement;
     if (el.closest("button, input, select, a[href]")) {
       setIsHovered(false);
@@ -106,7 +139,7 @@ function DraggableWindow({
       setIsHovered(true);
       setMousePos({ x: e.clientX, y: e.clientY });
     }
-  }, []);
+  }, [isDragging]);
 
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
@@ -114,19 +147,25 @@ function DraggableWindow({
 
   const positionStyles = centered
     ? { left: "50%", top: "50%", transform: "translate(-50%, -50%)" }
-    : { left: position.x, top: position.y, transform: "translate(-50%, 0)" as const };
+    : {
+        left: 0,
+        top: 0,
+        transform: `translate3d(${positionRef.current.x}px, ${positionRef.current.y}px, 0) translate3d(-50%, 0, 0)`,
+      };
 
   const finalZIndex = zIndex ?? style?.zIndex ?? 10;
 
   return (
     <>
       <div
+        ref={containerRef}
         className={[className, isDragging && draggingClassName].filter(Boolean).join(" ")}
         style={{
           ...style,
           position: positionType,
           ...positionStyles,
           zIndex: finalZIndex,
+          willChange: centered ? (style?.willChange as any) : "transform",
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
