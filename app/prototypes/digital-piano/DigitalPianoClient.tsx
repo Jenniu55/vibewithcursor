@@ -1080,7 +1080,6 @@ export default function DigitalPianoClient() {
         initialPosition={{ x: pianoCenterX, y: pianoTop }}
         className={styles.pianoWrapper}
         draggingClassName={styles.pianoDragging}
-        title="Drag to move piano"
         style={{ zIndex: 10 }}
       >
         <div className={styles.piano} style={{ margin: 0 }}>
